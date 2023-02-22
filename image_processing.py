@@ -20,6 +20,13 @@ def transform_nir(nir):
     return ret_nir
 
 
+def get_com_im(exg, ndvi):
+    com_im = exg.astype(np.uint16) * ndvi.astype(np.uint16) / 255
+    min_im = np.min(com_im)
+    max_im = np.max(com_im)
+    return (255 * (com_im - min_im) / (max_im - min_im)).astype(np.uint8)
+
+
 def get_norm_colors(im):
     b, g, r = cv2.split(im)
     b = b.astype(float)
@@ -106,14 +113,11 @@ def test_combination(path):
     nir_im = cv2.imread(nir_path, cv2.IMREAD_GRAYSCALE)
     ndvi = get_ndvi_im(color_im, nir_im)
 
-    com_im = exg.astype(np.uint16) * ndvi.astype(np.uint16) / 255
-    min_im = np.min(com_im)
-    max_im = np.max(com_im)
-
-    com_im = (255*(com_im-min_im)/(max_im-min_im)).astype(np.uint8)
+    com_im = get_com_im(exg, ndvi)
 
     show_im(com_im)
-    com_im = cv2.GaussianBlur(com_im, (5, 5), 0)
+    # com_im = cv2.GaussianBlur(com_im,(5,5),0)
+    com_im = cv2.medianBlur(com_im, 5)
     show_im(com_im)
     show_hist(com_im)
     ret, binary_im = cv2.threshold(com_im, 75, 255, cv2.THRESH_BINARY)
