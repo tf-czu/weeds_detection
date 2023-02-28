@@ -20,13 +20,6 @@ def transform_nir(nir):
     return ret_nir
 
 
-def get_com_im(exg, ndvi):
-    com_im = exg.astype(np.uint16) * ndvi.astype(np.uint16) / 255
-    min_im = np.min(com_im)
-    max_im = np.max(com_im)
-    return (255 * (com_im - min_im) / (max_im - min_im)).astype(np.uint8)
-
-
 def get_norm_colors(im):
     b, g, r = cv2.split(im)
     b = b.astype(float)
@@ -39,10 +32,7 @@ def get_norm_colors(im):
 def get_excess_green(im_color):
     b, g, r = get_norm_colors(im_color)
     exg = 2*g-r-b
-    # return ((exg + 2)/4 * 255).astype(np.uint8)
-    min_exg = np.min(exg)
-    max_exg = np.max(exg)
-    return ((exg-min_exg)/(max_exg-min_exg) * 255).astype(np.uint8)
+    return ((exg + 2)/4 * 255).astype(np.uint8)
 
 
 def get_ndvi_im(im_color, nir):
@@ -50,11 +40,13 @@ def get_ndvi_im(im_color, nir):
     r = r.astype(float)
     nir = nir.astype(float)
     ndvi = (nir - r) / (nir + r)
-    # ndvi_im = (ndvi + 1)/2 * 255
-    # return ndvi_im.astype(np.uint8)
-    min_ndvi = np.min(ndvi)
-    max_ndvi = np.max(ndvi)
-    return ((ndvi - min_ndvi) / (max_ndvi - min_ndvi) * 255).astype(np.uint8)
+    ndvi_im = (ndvi + 1)/2 * 255
+    return ndvi_im.astype(np.uint8)
+
+
+def get_com_im(exg, ndvi):
+    com_im = exg.astype(np.uint16) * ndvi.astype(np.uint16) / 255
+    return com_im.astype(np.uint8)
 
 
 def show_im(im):
@@ -71,6 +63,17 @@ def show_hist(im):
     plt.show()
 
 
+def draw_contours(binary_im, color_im):
+    contours, hierarchy = cv2.findContours(binary_im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(color_im, contours, -1, (255, 0, 0), thickness=1)
+    for cnt in contours:
+        if cv2.contourArea(cnt) > 100:
+            x, y, w, h = cv2.boundingRect(cnt)
+            cv2.rectangle(color_im, (x, y), (x + w, y + h), (0, 0, 255), 1)
+
+    return color_im
+
+
 def test_ndvi(path):
     assert os.path.isfile(path)
     assert path.endswith("C.tif")
@@ -85,9 +88,19 @@ def test_ndvi(path):
     # ndvi = cv2.GaussianBlur(ndvi, (5, 5), 0)
     # show_im(ndvi)
     show_hist(ndvi)
-    ret, binary_im = cv2.threshold(ndvi, 140, 255, cv2.THRESH_BINARY)
+
+    ndvi = cv2.equalizeHist(ndvi)
+    show_im(ndvi)
+    show_hist(ndvi)
+
+    ret, binary_im = cv2.threshold(ndvi, 130, 255, cv2.THRESH_BINARY)
     # binary_im = cv2.adaptiveThreshold(ndvi, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,21,2)
     show_im(binary_im)
+
+    binary_im = noise_reduction(binary_im)
+    show_im(binary_im)
+    color_im = draw_contours(binary_im, color_im)
+    show_im(color_im)
 
 
 def test_excess_green(path):
@@ -98,9 +111,14 @@ def test_excess_green(path):
 
     show_im(exg)
     show_hist(exg)
-    ret, binary_im = cv2.threshold(exg, 140, 255, cv2.THRESH_BINARY)
+    ret, binary_im = cv2.threshold(exg, 130, 255, cv2.THRESH_BINARY)
     # binary_im = cv2.adaptiveThreshold(exg, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 2)
     show_im(binary_im)
+
+    binary_im = noise_reduction(binary_im)
+    show_im(binary_im)
+    color_im = draw_contours(binary_im, color_im)
+    show_im(color_im)
 
 
 def test_combination(path):
@@ -114,29 +132,23 @@ def test_combination(path):
     ndvi = get_ndvi_im(color_im, nir_im)
 
     com_im = get_com_im(exg, ndvi)
-
     show_im(com_im)
     # com_im = cv2.GaussianBlur(com_im,(5,5),0)
     com_im = cv2.medianBlur(com_im, 5)
     show_im(com_im)
     show_hist(com_im)
+
+    # com_im = cv2.equalizeHist(com_im)
+    # show_im(com_im)
+    # show_hist(com_im)
+
     ret, binary_im = cv2.threshold(com_im, 75, 255, cv2.THRESH_BINARY)
     # binary_im = cv2.adaptiveThreshold(com_im, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 2)
     show_im(binary_im)
 
-    # reduce noise
     binary_im = noise_reduction(binary_im)
     show_im(binary_im)
-    contours, hierarchy = cv2.findContours(binary_im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # draw contours
-    cv2.drawContours(color_im, contours, -1, (255, 0, 0), thickness=1)
-    show_im(color_im)
-    for cnt in contours:
-        if cv2.contourArea(cnt) > 100:
-            x, y, w, h = cv2.boundingRect(cnt)
-            cv2.rectangle(color_im, (x, y), (x+w, y+h), (0, 0, 255), 1)
-
+    color_im = draw_contours(binary_im, color_im)
     show_im(color_im)
 
 
