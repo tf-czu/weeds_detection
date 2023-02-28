@@ -17,7 +17,7 @@ class LabelWeeds:
 
         self.labels = [0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39]
         self.current_label = "0"
-        self.thrvalue = 75
+        self.thrvalue = 140
         self.manual_xy = None
         self.manual_wh = None
         if os.path.exists(out_json):
@@ -29,6 +29,55 @@ class LabelWeeds:
         else:
             self.data = {}
         self.add_images()
+
+    @staticmethod
+    def make_im_to_show(im_color, bbox_list):
+        im_to_show = im_color.copy()
+        for x, y, w, h, kind in bbox_list:
+            if kind is None:
+                color = (0, 0, 255)
+            else:
+                color = (255, 0, 0)
+                cv2.putText(im_to_show, kind, (x + 3, y + 7), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.3,
+                            color=color, thickness=1)
+            cv2.rectangle(im_to_show, (x, y), (x + w, y + h), color, 1)
+        return im_to_show
+
+    def make_hist_im(self, gray):
+        bin_w = 2
+        hist_h = 400
+        hist = cv2.calcHist([gray], [0], None, [256], (0, 256), accumulate=False)
+        cv2.normalize(hist, hist, alpha=0, beta=400, norm_type=cv2.NORM_MINMAX)
+        hist_im = np.zeros((hist_h + 50, 512, 3), dtype=np.uint8)
+        for ii in range(1, 256):
+            cv2.line(hist_im, (bin_w * (ii - 1), hist_h - int(hist[ii - 1])),
+                    (bin_w * (ii), hist_h - int(hist[ii])),
+                    (255, 0, 0), thickness=2)
+        cv2.line(hist_im, (self.thrvalue*2, 0), (self.thrvalue*2, 400), (0, 0, 255), thickness=2)
+        cv2.putText(hist_im, str(self.thrvalue), (412, 448), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
+                    color=(0, 255, 0), thickness=2)
+        return hist_im
+
+    def make_gray_im(self, color_path, method="ndvi"):
+        nir_path = self.data[color_path]["nir"]
+        im_color = cv2.imread(color_path)
+
+        im_nir = cv2.imread(nir_path, cv2.IMREAD_GRAYSCALE)
+        nir = transform_nir(im_nir)
+        if method == "ndvi":
+            gray = get_ndvi_im(im_color, nir)
+        elif method == "exg":
+            gray = get_excess_green(im_color)
+        elif method == "com":
+            ndvi = get_ndvi_im(im_color, nir)
+            exg = get_excess_green(im_color)
+            gray = get_com_im(exg, ndvi)
+        else:
+            assert False, f"unknown method: {method}"
+        gray = cv2.medianBlur(gray, 5)
+        # gray = cv2.equalizeHist(gray)
+        hist_im = self.make_hist_im(gray)
+        return gray, hist_im
 
     def save_data(self):
         with open(self.out_json, "w") as outfile:
@@ -45,18 +94,9 @@ class LabelWeeds:
                     if not color_path in self.data:
                         self.data[color_path] = {"nir": nir_path}
 
-    def get_bbox(self, color_path):
-        nir_path = self.data[color_path]["nir"]
-        im_color = cv2.imread(color_path)
-
-        im_nir = cv2.imread(nir_path, cv2.IMREAD_GRAYSCALE)
-        nir = transform_nir(im_nir)
-        ndvi = get_ndvi_im(im_color, nir)
-        exg = get_excess_green(im_color)
-        com_im = get_com_im(exg, ndvi)
-
-        com_im = cv2.medianBlur(com_im, 5)
-        ret, binary_im = cv2.threshold(com_im, self.thrvalue, 255, cv2.THRESH_BINARY)
+    def get_bbox(self, gray):
+        assert gray is not None
+        ret, binary_im = cv2.threshold(gray, self.thrvalue, 255, cv2.THRESH_BINARY)
         binary_im = noise_reduction(binary_im)
         contours, hierarchy = cv2.findContours(binary_im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         bbox_list = []
@@ -64,21 +104,7 @@ class LabelWeeds:
             if cv2.contourArea(cnt) > 100:
                 x, y, w, h = cv2.boundingRect(cnt)
                 bbox_list.append([x, y, w, h, None])
-
         return bbox_list
-
-    @staticmethod
-    def make_im_to_show(im_color, bbox_list):
-        im_to_show = im_color.copy()
-        for x, y, w, h, kind in bbox_list:
-            if kind is None:
-                color = (0, 0, 255)
-            else:
-                color = (255, 0, 0)
-                cv2.putText(im_to_show, kind, (x + 3, y + 7), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.3,
-                            color=(color), thickness=1)
-            cv2.rectangle(im_to_show, (x, y), (x + w, y + h), color, 1)
-        return im_to_show
 
     def make_sub_im(self, im_color, im_to_show, bbox):
         x, y, w, h, kind = bbox
@@ -139,6 +165,8 @@ class LabelWeeds:
         bbox_list = None
         im_name = None
         im_color = None
+        hist_im = None
+        gray = None
         while True:
             if ii < 0:
                 ii = 0
@@ -148,14 +176,14 @@ class LabelWeeds:
             if new_image:
                 im_name = item_list[ii]
                 im_color = cv2.imread(im_name)
+                gray, hist_im = self.make_gray_im(im_name)
 
-                im_dic = self.data[im_name]
-                bbox_list = im_dic.get("bbox_list")
-
+                bbox_list = self.data[im_name].get("bbox_list")
+                self.thrvalue = self.data[im_name].get("thrvalue", self.thrvalue)
                 new_image = False
 
             if bbox_list is None:
-                bbox_list = self.get_bbox(im_name)
+                bbox_list = self.get_bbox(gray)
 
             if jj < 0:
                 jj = 0
@@ -177,6 +205,9 @@ class LabelWeeds:
 
             cv2.namedWindow("win", cv2.WINDOW_NORMAL)
             cv2.namedWindow("sub_win", cv2.WINDOW_NORMAL)
+            if hist_im is not None:
+                cv2.namedWindow("hist", cv2.WINDOW_NORMAL)
+                cv2.imshow("hist", hist_im)
             cv2.setMouseCallback('sub_win', self.manual_label)
             cv2.resizeWindow("win", m // 2, n // 2)
             cv2.imshow("win", im_to_show)
@@ -203,6 +234,15 @@ class LabelWeeds:
                 ii -= 1
                 jj = 0
                 new_image = True
+            elif k == ord("+"):  # move thrvalue
+                self.thrvalue += 2
+                gray, hist_im = self.make_gray_im(im_name)
+            elif k == ord("-"):
+                self.thrvalue -= 2  # move thrvalue
+                gray, hist_im = self.make_gray_im(im_name)
+            elif k == ord("u"):  # update bbox_list
+                bbox_list = self.get_bbox(gray)
+                self.data[im_name]["thrvalue"] = self.thrvalue
             elif k == ord("s"):
                 self.save_data()
             elif k == ord("q"):
