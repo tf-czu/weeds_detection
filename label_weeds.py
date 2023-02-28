@@ -1,5 +1,5 @@
 """
-  Tool for weeds labeling in imagesTool for weeds labeling in images
+  Tool for weeds labeling in images.
 """
 import os
 import cv2
