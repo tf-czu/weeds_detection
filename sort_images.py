@@ -19,12 +19,25 @@ def stat_test(data1, data2):
         assert len(diff_arr[diff_arr < 50]) <= 1
 
 
-def copy_twins(img_dir, twins, num_offset=0):
-    assert not os.path.exists(os.path.join(img_dir, "twins"))  # "Twins directory already exists!"
+def copy_twins(img_dir, twins, im_id=0):
+    if not twins:
+        return im_id
+    log = open(os.path.join(img_dir, "rename_log.log"), "w")
+    assert not os.path.exists(os.path.join(img_dir, "twins")), img_dir  # "Twins directory already exists!"
     os.makedirs(os.path.join(img_dir, "twins"))
-    for ii, (rgb_path, nir_path) in enumerate(twins):
-        shutil.copy(rgb_path, os.path.join(img_dir, "twins", f"im_{num_offset + ii:06d}_rgb"))
-        shutil.copy(nir_path, os.path.join(img_dir, "twins", f"im_{num_offset + ii:06d}_nir"))
+    for rgb_path, nir_path in twins:
+        im_id += 1
+        new_rgb_name = f"im_{im_id:06d}_rgb"
+        shutil.copy(rgb_path, os.path.join(img_dir, "twins", new_rgb_name))
+        log.write(f"{rgb_path}, {new_rgb_name}\r\n")
+
+        new_nir_name = f"im_{im_id:06d}_nir"
+        shutil.copy(nir_path, os.path.join(img_dir, "twins", new_nir_name))
+        log.write(f"{nir_path}, {new_nir_name}\r\n")
+
+    log.close()
+
+    return im_id
 
 
 def name_to_timestamp(img_list):
@@ -38,13 +51,15 @@ def name_to_timestamp(img_list):
 
 
 def sort_by_time(rgb_list, nir_list):
+    if not rgb_list or not nir_list:
+        return
     img_twins = []
     rgb_timestamps = name_to_timestamp(rgb_list)
     nir_timestamps = name_to_timestamp(nir_list)
     stat_test(rgb_timestamps, nir_timestamps)
 
     nir_timestamps_arr = np.asarray(nir_timestamps)
-    for rgb_path, rgb_time_id in zip (rgb_list, rgb_timestamps):
+    for rgb_path, rgb_time_id in zip(rgb_list, rgb_timestamps):
         time_diff = abs(nir_timestamps_arr-rgb_time_id)
         if min(time_diff) < MIN_TIME_DIFF:
             nir_path = nir_list[np.argmin(time_diff)]
@@ -53,11 +68,11 @@ def sort_by_time(rgb_list, nir_list):
     return img_twins
 
 
-def sort_images(img_dir):
+def sort_images(img_dir, last_im_id=0):
     rgb_list = []
     nir_list = []
     dir_content = os.listdir(img_dir)
-    print(dir_content)
+    # print(dir_content)
     for item in dir_content:
         item_path = os.path.join(img_dir, item)  # directory with rgb or nir images
         if os.path.isdir(item_path) and ("NIR" in item or "RGB" in item):
@@ -74,11 +89,29 @@ def sort_images(img_dir):
                         nir_list.append(img_name_path)
 
     img_twins = sort_by_time(rgb_list, nir_list)
-    copy_twins(img_dir, img_twins)
+    return copy_twins(img_dir, img_twins, last_im_id)
 
 
-def all_directories(main_dir):
-    pass
+def all_directories(main_dir, num_offset):
+    dir_content = os.listdir(main_dir)
+    for im_dir in dir_content:
+        im_dir_path = os.path.join(main_dir, im_dir)
+        if os.path.isdir(im_dir_path):
+            print(im_dir_path)
+            print(f"Last im_id: {num_offset}")
+            num_offset = sort_images(im_dir_path, num_offset)
+
+
+def del_twins(main_dir):
+    response = input(f"Delete all twins directories in {main_dir}?  ")
+    if response != "yes":
+        return
+    dir_content = os.listdir(main_dir)
+    for im_dir in dir_content:
+        twin_path = os.path.join(main_dir, im_dir, "twins")
+        if os.path.exists(twin_path):
+            print(f"Removing: {twin_path}")
+            shutil.rmtree(twin_path)
 
 
 if __name__ == "__main__":
@@ -86,10 +119,14 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('img_dir', help='Images directory.')
+    parser.add_argument("--num-offset", "-n", help="Initial image id", default=0, type=int)
     parser.add_argument('--all', '-a', help='Apply on all subdirectories.', action="store_true")
+    parser.add_argument("--del-twins", help='Delete twins directories', action="store_true")
     args = parser.parse_args()
 
-    if args.all:
-        all_directories(args.img_dir)
+    if args.del_twins:
+        del_twins(args.img_dir)
+    elif args.all:
+        all_directories(args.img_dir, args.num_offset)
     else:
-        sort_images(args.img_dir)
+        sort_images(args.img_dir, args.num_offset)
