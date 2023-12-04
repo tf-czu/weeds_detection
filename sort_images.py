@@ -47,15 +47,20 @@ def name_to_timestamp(img_list):
         time_id = int(im_name[:-5].split("_")[1], 16)
         timestamps_list.append(time_id)
 
-    return timestamps_list
+    # sort data
+    time_im = sorted(zip(timestamps_list, img_list))
+    img_list2 = [im for __, im, in time_im]
+    timestamps_list2 = [t for t, __ in time_im]
+
+    return timestamps_list2, img_list2
 
 
 def sort_by_time(rgb_list, nir_list):
     if not rgb_list or not nir_list:
         return
     img_twins = []
-    rgb_timestamps = name_to_timestamp(rgb_list)
-    nir_timestamps = name_to_timestamp(nir_list)
+    rgb_timestamps, rgb_list = name_to_timestamp(rgb_list)
+    nir_timestamps, nir_list = name_to_timestamp(nir_list)
     stat_test(rgb_timestamps, nir_timestamps)
 
     nir_timestamps_arr = np.asarray(nir_timestamps)
