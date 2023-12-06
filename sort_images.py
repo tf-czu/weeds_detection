@@ -27,11 +27,11 @@ def copy_twins(img_dir, twins, im_id=0):
     os.makedirs(os.path.join(img_dir, "twins"))
     for rgb_path, nir_path in twins:
         im_id += 1
-        new_rgb_name = f"im_{im_id:06d}_rgb"
+        new_rgb_name = f"im_{im_id:06d}_rgb.tiff"
         shutil.copy(rgb_path, os.path.join(img_dir, "twins", new_rgb_name))
         log.write(f"{rgb_path}, {new_rgb_name}\r\n")
 
-        new_nir_name = f"im_{im_id:06d}_nir"
+        new_nir_name = f"im_{im_id:06d}_nir.tiff"
         shutil.copy(nir_path, os.path.join(img_dir, "twins", new_nir_name))
         log.write(f"{nir_path}, {new_nir_name}\r\n")
 
