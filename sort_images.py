@@ -32,8 +32,6 @@ def copy_twins(img_dir, twins, im_id=0):
         log.write(f"{rgb_path}, {new_rgb_name}\r\n")
 
         new_nir_name = f"im_{im_id:06d}_nir.tiff"
-        shutil.copy(nir_path, os.path.join(img_dir, "twins", new_nir_name))
-        log.write(f"{nir_path}, {new_nir_name}\r\n")
 
     log.close()
 
