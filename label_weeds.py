@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import json
 
-from image_processing import transform_nir, get_ndvi_im, get_excess_green, get_com_im, noise_reduction
+from image_processing import transform_nir, get_ndvi_im, get_excess_green, get_com_im, noise_reduction, pavel_method
 
 
 class LabelWeeds:
@@ -158,6 +158,7 @@ class LabelWeeds:
 
     def run(self):
         # print(self.data)
+        double_q = False  # Flag to track double "q" presses
         item_list = [d for d in self.data]
         ii = 0
         jj = 0
@@ -246,10 +247,15 @@ class LabelWeeds:
             elif k == ord("s"):
                 self.save_data()
             elif k == ord("q"):
-                cv2.destroyAllWindows()
-                break
+                if double_q:  # Check if "q" was pressed previously
+                    cv2.destroyAllWindows()
+                    break
+                else:
+                    double_q = True  # Set the flag for the first "q" press
 
             else:
+                double_q = False  # Reset the flag if any other key is pressed
+
                 pass
                 #print(k, chr(k))
 
