@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import json
 
-from image_processing import transform_nir, get_ndvi_im, get_excess_green, get_com_im, noise_reduction
+from image_processing import transform_nir, get_ndvi_im, get_excess_green, get_com_im, noise_reduction, pavel_method
 
 
 class LabelWeeds:
@@ -58,13 +58,15 @@ class LabelWeeds:
                     color=(0, 255, 0), thickness=2)
         return hist_im
 
-    def make_gray_im(self, color_path, method="ndvi"):
+    def make_gray_im(self, color_path, method="pavel"):
         nir_path = self.data[color_path]["nir"]
         im_color = cv2.imread(color_path)
 
         im_nir = cv2.imread(nir_path, cv2.IMREAD_GRAYSCALE)
         nir = transform_nir(im_nir)
-        if method == "ndvi":
+        if method == "pavel":
+            gray == pavel_method(im_color, nir)
+        elif method == "ndvi":
             gray = get_ndvi_im(im_color, nir)
         elif method == "exg":
             gray = get_excess_green(im_color)
@@ -80,16 +82,66 @@ class LabelWeeds:
         return gray, hist_im
 
     def save_data(self):
+        via_settings = {
+            "_via_settings": {
+                "ui": {
+                    "annotation_editor_height": 25,
+                    "annotation_editor_fontsize": 0.8,
+                    "leftsidebar_width": 18,
+                    "image_grid": {
+                        "img_height": 80,
+                        "rshape_fill": "none",
+                        "rshape_fill_opacity": 0.3,
+                        "rshape_stroke": "yellow",
+                        "rshape_stroke_width": 2,
+                        "show_region_shape": True,
+                        "show_image_policy": "all",
+                    },
+                    "image": {
+                        "region_label": "__via_region_id__",
+                        "region_color": "__via_default_region_color__",
+                        "region_label_font": "10px Sans",
+                        "on_image_annotation_editor_placement": "NEAR_REGION",
+                    },
+                },
+                "core": {
+                    "buffer_size": "18",
+                    "filepath": {},
+                    "default_filepath": self.path,
+                },
+                "project": {
+                    "name": "Weeds_2024",
+                },
+            },
+            "_via_img_metadata": self.data,
+            "_via_attributes": {
+                "region": {
+                    "type": {
+                        "type": "dropdown",
+                        "description": "Name of the object",
+                        "options": {
+                            "parp": "",
+                            "amare": "",
+                            "alomy": "",
+                            "echcg": "",
+                            "tbc...": "",
+                        },
+                    }
+                },
+                "file": {},
+            },
+        }
+
         with open(self.out_json, "w") as outfile:
-            json.dump(self.data, outfile, indent=4)
+            json.dump(via_settings, outfile, indent=4)
 
     def add_images(self):
         assert os.path.isdir(self.path)
         file_list = os.listdir(self.path)
         for item in sorted(file_list):
-            if item.endswith("C.tif"):
+            if item.endswith("rgb.tif"):
                 color_path = os.path.join(self.path, item)
-                nir_path = os.path.join(self.path, item[:-5]+"N.tif")
+                nir_path = os.path.join(self.path, item[:-5]+"nir.tif")
                 if os.path.exists(nir_path):
                     if not color_path in self.data:
                         self.data[color_path] = {"nir": nir_path}
