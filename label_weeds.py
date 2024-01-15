@@ -157,6 +157,12 @@ class LabelWeeds:
                 x, y, w, h = cv2.boundingRect(cnt)
                 bbox_list.append([x, y, w, h, None])
         return bbox_list
+    def annotate_all_objects(self, bbox_list):
+        # Annotate all objects in the image with the current label
+        for bbox in bbox_list:
+            if bbox[4] is None:
+                bbox[4] = self.current_label    
+    
 
     def make_sub_im(self, im_color, im_to_show, bbox):
         x, y, w, h, kind = bbox
@@ -289,6 +295,8 @@ class LabelWeeds:
             elif k == ord("+"):  # move thrvalue
                 self.thrvalue += 2
                 gray, hist_im = self.make_gray_im(im_name)
+            elif k == ord("o"):  # Annotate all objects with the current label
+                self.annotate_all_objects(bbox_list)    
             elif k == ord("-"):
                 self.thrvalue -= 2  # move thrvalue
                 gray, hist_im = self.make_gray_im(im_name)
