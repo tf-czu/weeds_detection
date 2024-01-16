@@ -65,7 +65,7 @@ class LabelWeeds:
         im_nir = cv2.imread(nir_path, cv2.IMREAD_GRAYSCALE)
         nir = transform_nir(im_nir)
         if method == "pavel":
-            gray == pavel_method(im_color, nir)
+            gray = pavel_method(im_color, nir)
         elif method == "ndvi":
             gray = get_ndvi_im(im_color, nir)
         elif method == "exg":
@@ -141,7 +141,7 @@ class LabelWeeds:
         for item in sorted(file_list):
             if item.endswith("rgb.tif"):
                 color_path = os.path.join(self.path, item)
-                nir_path = os.path.join(self.path, item[:-5]+"nir.tif")
+                nir_path = os.path.join(self.path, item[:-7]+"nir.tif")
                 if os.path.exists(nir_path):
                     if not color_path in self.data:
                         self.data[color_path] = {"nir": nir_path}
