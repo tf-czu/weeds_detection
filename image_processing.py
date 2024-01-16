@@ -51,10 +51,10 @@ def pavel_method(im_color, nir):
     nir = nir.astype(float)
     # Processing formula: (2xNIR + Green - Red - Blue + 510)/4
     # processed_im = (1 * nir + g - r - b +510) /4
-    processed_im = (((2 * nir + g - r - b) / (2 * nir + g + r + b + 510) - 0.05) * 1.8 + 1) * 128
+    processed_im = (((2 * nir + g - r - b) / (2 * nir + g + r + b + 510) - 0.05) * 1.8 + 1) * 128.0
     # processed_im = cv2.convertScaleAbs(processed_im)
     # processed_im = (processed_im - processed_im.min())/(processed_im.max() - processed_im.min()) * 255
-    processed_im = (processed_im - 90) / (170 - 90) * 255
+    # processed_im = (processed_im - 90) / (170 - 90) * 255
     return processed_im.astype(np.uint8)
 
 

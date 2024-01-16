@@ -10,13 +10,13 @@ from image_processing import transform_nir, get_ndvi_im, get_excess_green, get_c
 
 
 class LabelWeeds:
-    def __init__(self, path, out_json):
+    def __init__(self, path, out_json, label_names):
         self.path = path
         assert out_json.endswith(".json"), out_json
         self.out_json = out_json
 
-        self.labels = [0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39]
-        self.current_label = "0"
+        self.labels = [str(label) for label in label_names]  # Convert labels to strings
+        self.current_label = self.labels[0]  # Set the initial label
         self.thrvalue = 140
         self.manual_xy = None
         self.manual_wh = None
@@ -42,6 +42,7 @@ class LabelWeeds:
                             color=color, thickness=1)
             cv2.rectangle(im_to_show, (x, y), (x + w, y + h), color, 1)
         return im_to_show
+
 
     def make_hist_im(self, gray):
         bin_w = 2
@@ -139,9 +140,9 @@ class LabelWeeds:
         assert os.path.isdir(self.path)
         file_list = os.listdir(self.path)
         for item in sorted(file_list):
-            if item.endswith("rgb.tif"):
+            if item.lower().endswith("_rgb.tiff"):
                 color_path = os.path.join(self.path, item)
-                nir_path = os.path.join(self.path, item[:-7]+"nir.tif")
+                nir_path = os.path.join(self.path, item.replace("_rgb.tiff", "_nir.tiff"))
                 if os.path.exists(nir_path):
                     if not color_path in self.data:
                         self.data[color_path] = {"nir": nir_path}
@@ -172,6 +173,13 @@ class LabelWeeds:
         y0 = max(0, y - 100)
         x1 = min(m, x + w + 100)
         y1 = min(n, y + h + 100)
+
+        # Make bounding box larger by 2 pixels
+        x0 = max(0, x0 - 2)
+        y0 = max(0, y0 - 2)
+        x1 = min(m, x1 + 2)
+        y1 = min(n, y1 + 2)
+
         sub_im = im_color.copy()[y0:y1, x0:x1, :]
         cv2.rectangle(im_to_show, (x, y), (x + w, y + h), (0, 255, 255), 2)
         label_strip = np.ones((sub_im.shape[0], 30, 3), dtype=np.uint8) * 255
@@ -214,6 +222,13 @@ class LabelWeeds:
                     return
                 self.manual_wh = (x-x0, y-y0)
 
+    def switch_label(self, direction):
+        labels_count = len(self.labels)
+        current_index = self.labels.index(self.current_label)
+        new_index = (current_index + direction) % labels_count
+        self.current_label = str(self.labels[new_index])
+          
+
     def run(self):
         # print(self.data)
         item_list = [d for d in self.data]
@@ -226,6 +241,10 @@ class LabelWeeds:
         hist_im = None
         gray = None
         while True:
+            if not item_list:
+                print("No images found in the specified directory.")
+                break
+
             if ii < 0:
                 ii = 0
             elif ii >= len(item_list):
@@ -293,18 +312,22 @@ class LabelWeeds:
                 jj = 0
                 new_image = True
             elif k == ord("+"):  # move thrvalue
-                self.thrvalue += 2
+                self.thrvalue += 1
                 gray, hist_im = self.make_gray_im(im_name)
             elif k == ord("o"):  # Annotate all objects with the current label
                 self.annotate_all_objects(bbox_list)    
             elif k == ord("-"):
-                self.thrvalue -= 2  # move thrvalue
+                self.thrvalue -= 1  # move thrvalue
                 gray, hist_im = self.make_gray_im(im_name)
             elif k == ord("u"):  # update bbox_list
                 bbox_list = self.get_bbox(gray)
                 self.data[im_name]["thrvalue"] = self.thrvalue
             elif k == ord("s"):
                 self.save_data()
+            elif k == ord("["):  # switch to the previous label
+                self.switch_label(-1)
+            elif k == ord("]"):  # switch to the next label
+                self.switch_label(1)   
             elif k == ord("q"):
                 cv2.destroyAllWindows()
                 break
@@ -322,7 +345,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='__doc__')
     parser.add_argument('path', help='Path to image directory.')
     parser.add_argument('--out', help='Specify an annotation file name (.json)', default="test.json")
+    parser.add_argument('--labels', nargs='+', help='List of label names.')
 
     args = parser.parse_args()
-    label = LabelWeeds(path=args.path, out_json=args.out)
+    label = LabelWeeds(path=args.path, out_json=args.out, label_names=args.labels)
     label.run()
