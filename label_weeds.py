@@ -1,5 +1,5 @@
 """
-  Tool for weeds labeling in images.
+Tool for weeds labeling in images.
 """
 import os
 import cv2
@@ -43,7 +43,6 @@ class LabelWeeds:
             cv2.rectangle(im_to_show, (x, y), (x + w, y + h), color, 1)
         return im_to_show
 
-
     def make_hist_im(self, gray):
         bin_w = 2
         hist_h = 400
@@ -77,7 +76,7 @@ class LabelWeeds:
             gray = get_com_im(exg, ndvi)
         else:
             assert False, f"unknown method: {method}"
-        gray = cv2.medianBlur(gray, 5)
+        # gray = cv2.medianBlur(gray, 5)
         # gray = cv2.equalizeHist(gray)
         hist_im = self.make_hist_im(gray)
         return gray, hist_im
@@ -150,20 +149,28 @@ class LabelWeeds:
     def get_bbox(self, gray):
         assert gray is not None
         ret, binary_im = cv2.threshold(gray, self.thrvalue, 255, cv2.THRESH_BINARY)
-        binary_im = noise_reduction(binary_im)
+        # binary_im = noise_reduction(binary_im)
         contours, hierarchy = cv2.findContours(binary_im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         bbox_list = []
         for cnt in contours:
-            if cv2.contourArea(cnt) > 100:
+            if cv2.contourArea(cnt) > 50:
                 x, y, w, h = cv2.boundingRect(cnt)
                 bbox_list.append([x, y, w, h, None])
         return bbox_list
+
     def annotate_all_objects(self, bbox_list):
         # Annotate all objects in the image with the current label
         for bbox in bbox_list:
             if bbox[4] is None:
-                bbox[4] = self.current_label    
-    
+                bbox[4] = self.current_label
+
+    def draw_pre_annotated_boxes_nir(self, im_nir, bbox_list):
+        nir_im_with_boxes = im_nir.copy()
+
+        for x, y, w, h, kind in bbox_list:
+            cv2.rectangle(nir_im_with_boxes, (x, y), (x + w, y + h), (0, 255, 255), 2)
+
+        return nir_im_with_boxes
 
     def make_sub_im(self, im_color, im_to_show, bbox):
         x, y, w, h, kind = bbox
@@ -188,7 +195,7 @@ class LabelWeeds:
 
         if self.manual_xy and self.manual_wh is None:
             xm, ym = self.manual_xy
-            cv2.circle(sub_im, (xm , ym), 4, (0, 255, 255), -1)
+            cv2.circle(sub_im, (xm, ym), 4, (0, 255, 255), -1)
             return im_to_show, np.hstack((label_strip, sub_im)), new_bbox
 
         elif self.manual_wh:
@@ -227,7 +234,6 @@ class LabelWeeds:
         current_index = self.labels.index(self.current_label)
         new_index = (current_index + direction) % labels_count
         self.current_label = str(self.labels[new_index])
-          
 
     def run(self):
         # print(self.data)
@@ -282,6 +288,7 @@ class LabelWeeds:
 
             cv2.namedWindow("win", cv2.WINDOW_NORMAL)
             cv2.namedWindow("sub_win", cv2.WINDOW_NORMAL)
+            cv2.namedWindow("nir_win", cv2.WINDOW_NORMAL)  # New NIR window
             if hist_im is not None:
                 cv2.namedWindow("hist", cv2.WINDOW_NORMAL)
                 cv2.imshow("hist", hist_im)
@@ -289,6 +296,13 @@ class LabelWeeds:
             cv2.resizeWindow("win", m // 2, n // 2)
             cv2.imshow("win", im_to_show)
             cv2.imshow("sub_win", sub_im)
+
+            # Display the NIR image with pre-annotated bounding boxes in the "nir_win" window
+            if im_name in self.data and "nir" in self.data[im_name]:
+                nir_path = self.data[im_name]["nir"]
+                im_nir = cv2.imread(nir_path, cv2.IMREAD_GRAYSCALE)
+                nir_im_with_boxes = self.draw_pre_annotated_boxes_nir(gray, bbox_list)
+                cv2.imshow("nir_win", nir_im_with_boxes)
 
             k = cv2.waitKey(100) & 0xFF
             if k == ord(" "):  # label and take next sub_img
@@ -300,22 +314,21 @@ class LabelWeeds:
                 jj -= 1
             elif k == ord("r"):  # reset current sub_img
                 bbox_list[jj][4] = None
-            elif k in self.labels:  # set weed label
-                self.current_label = chr(k)
-
-            elif k in [0x53, ord("d")]:  # take next image
-                ii += 1
-                jj = 0
-                new_image = True
-            elif k in [0x51, ord("a")]:  # take one image back
-                ii -= 1
-                jj = 0
-                new_image = True
+            elif k == ord("o"):  # Annotate all objects with the current label
+                self.annotate_all_objects(bbox_list)
+            elif k == ord("d"):  # Delete current annotation
+                bbox_list.pop(jj)
             elif k == ord("+"):  # move thrvalue
                 self.thrvalue += 1
                 gray, hist_im = self.make_gray_im(im_name)
-            elif k == ord("o"):  # Annotate all objects with the current label
-                self.annotate_all_objects(bbox_list)    
+            elif k in [0x53, ord("e")]:  # take next image
+                ii += 1
+                jj = 0
+                new_image = True
+            elif k in [0x51, ord("w")]:  # take one image back
+                ii -= 1
+                jj = 0
+                new_image = True    
             elif k == ord("-"):
                 self.thrvalue -= 1  # move thrvalue
                 gray, hist_im = self.make_gray_im(im_name)
@@ -327,14 +340,13 @@ class LabelWeeds:
             elif k == ord("["):  # switch to the previous label
                 self.switch_label(-1)
             elif k == ord("]"):  # switch to the next label
-                self.switch_label(1)   
+                self.switch_label(1)
             elif k == ord("q"):
                 cv2.destroyAllWindows()
                 break
-
             else:
                 pass
-                #print(k, chr(k))
+                # print(k, chr(k))
 
             self.data[im_name]["bbox_list"] = bbox_list
             # print(k, chr(k), ii, jj)
@@ -350,3 +362,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     label = LabelWeeds(path=args.path, out_json=args.out, label_names=args.labels)
     label.run()
+
