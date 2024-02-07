@@ -1,34 +1,23 @@
-"""
-Tool for weeds labeling in images.
-"""
 import os
 import cv2
 import numpy as np
-import json
+import xml.etree.ElementTree as ET
 
 from image_processing import transform_nir, get_ndvi_im, get_excess_green, get_com_im, noise_reduction, pavel_method
 
-
 class LabelWeeds:
-    def __init__(self, path, out_json, label_names):
+    def __init__(self, path, out, label_names):
         self.path = path
-        assert out_json.endswith(".json"), out_json
-        self.out_json = out_json
-
+        assert os.path.isdir(out), f"Output directory '{out}' does not exist."
+        self.out_dir = out
         self.labels = [str(label) for label in label_names]  # Convert labels to strings
         self.current_label = self.labels[0]  # Set the initial label
         self.thrvalue = 140
         self.manual_xy = None
         self.manual_wh = None
-        if os.path.exists(out_json):
-            with open(out_json) as json_file:
-                self.data = json.load(json_file)
-            # make a backup
-            with open(self.out_json+".backup", "w") as outfile:
-                json.dump(self.data, outfile, indent=4)
-        else:
-            self.data = {}
+        self.data = {}
         self.add_images()
+
 
     @staticmethod
     def make_im_to_show(im_color, bbox_list):
@@ -81,59 +70,40 @@ class LabelWeeds:
         hist_im = self.make_hist_im(gray)
         return gray, hist_im
 
-    def save_data(self):
-        via_settings = {
-            "_via_settings": {
-                "ui": {
-                    "annotation_editor_height": 25,
-                    "annotation_editor_fontsize": 0.8,
-                    "leftsidebar_width": 18,
-                    "image_grid": {
-                        "img_height": 80,
-                        "rshape_fill": "none",
-                        "rshape_fill_opacity": 0.3,
-                        "rshape_stroke": "yellow",
-                        "rshape_stroke_width": 2,
-                        "show_region_shape": True,
-                        "show_image_policy": "all",
-                    },
-                    "image": {
-                        "region_label": "__via_region_id__",
-                        "region_color": "__via_default_region_color__",
-                        "region_label_font": "10px Sans",
-                        "on_image_annotation_editor_placement": "NEAR_REGION",
-                    },
-                },
-                "core": {
-                    "buffer_size": "18",
-                    "filepath": {},
-                    "default_filepath": self.path,
-                },
-                "project": {
-                    "name": "Weeds_2024",
-                },
-            },
-            "_via_img_metadata": self.data,
-            "_via_attributes": {
-                "region": {
-                    "type": {
-                        "type": "dropdown",
-                        "description": "Name of the object",
-                        "options": {
-                            "parp": "",
-                            "amare": "",
-                            "alomy": "",
-                            "echcg": "",
-                            "tbc...": "",
-                        },
-                    }
-                },
-                "file": {},
-            },
-        }
+    def save_data_voc(self):
+        for image_name, image_data in self.data.items():
+            root_elem = ET.Element("annotation")
 
-        with open(self.out_json, "w") as outfile:
-            json.dump(via_settings, outfile, indent=4)
+            filename_elem = ET.SubElement(root_elem, "filename")
+            filename_elem.text = os.path.basename(image_name)
+
+            bbox_list = image_data.get("bbox_list", [])
+            for bbox in bbox_list:
+                label = bbox[4]
+                if label:
+                    object_elem = self.make_object_element(bbox[:4], label)
+                    root_elem.append(object_elem)
+
+            tree = ET.ElementTree(root_elem)
+            xml_path = os.path.join(self.out_dir, f"{os.path.splitext(os.path.basename(image_name))[0]}.xml")
+            tree.write(xml_path, encoding="utf-8", xml_declaration=True)
+
+    @staticmethod
+    def make_object_element(bbox, label):
+        x, y, w, h = bbox
+        object_elem = ET.Element("object")
+        name_elem = ET.SubElement(object_elem, "name")
+        name_elem.text = label
+        bndbox_elem = ET.SubElement(object_elem, "bndbox")
+        xmin_elem = ET.SubElement(bndbox_elem, "xmin")
+        xmin_elem.text = str(x)
+        ymin_elem = ET.SubElement(bndbox_elem, "ymin")
+        ymin_elem.text = str(y)
+        xmax_elem = ET.SubElement(bndbox_elem, "xmax")
+        xmax_elem.text = str(x + w)
+        ymax_elem = ET.SubElement(bndbox_elem, "ymax")
+        ymax_elem.text = str(y + h)
+        return object_elem        
 
     def add_images(self):
         assert os.path.isdir(self.path)
@@ -153,7 +123,7 @@ class LabelWeeds:
         contours, hierarchy = cv2.findContours(binary_im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         bbox_list = []
         for cnt in contours:
-            if cv2.contourArea(cnt) > 50:
+            if cv2.contourArea(cnt) > 80:
                 x, y, w, h = cv2.boundingRect(cnt)
                 bbox_list.append([x, y, w, h, None])
         return bbox_list
@@ -336,7 +306,7 @@ class LabelWeeds:
                 bbox_list = self.get_bbox(gray)
                 self.data[im_name]["thrvalue"] = self.thrvalue
             elif k == ord("s"):
-                self.save_data()
+                self.save_data_voc()
             elif k == ord("["):  # switch to the previous label
                 self.switch_label(-1)
             elif k == ord("]"):  # switch to the next label
@@ -356,10 +326,9 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='__doc__')
     parser.add_argument('path', help='Path to image directory.')
-    parser.add_argument('--out', help='Specify an annotation file name (.json)', default="test.json")
+    parser.add_argument('--out', help='Specify an output directory for annotations.', required=True)
     parser.add_argument('--labels', nargs='+', help='List of label names.')
 
     args = parser.parse_args()
-    label = LabelWeeds(path=args.path, out_json=args.out, label_names=args.labels)
+    label = LabelWeeds(path=args.path, out=args.out, label_names=args.labels)
     label.run()
-
