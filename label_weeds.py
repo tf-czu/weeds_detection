@@ -37,35 +37,21 @@ class LabelWeeds:
             cv2.rectangle(im_to_show, (x, y), (x + w, y + h), color, 1)
         return im_to_show
     
-    @staticmethod
+    #@staticmethod
     def make_object_element(self, bbox, label, dom):
-        x, y, w, h = bbox
-        object_elem = dom.createElement("object")
-
-        name_elem = dom.createElement("name")
-        name_elem.appendChild(dom.createTextNode(label))
-        object_elem.appendChild(name_elem)
-
-        bndbox_elem = dom.createElement("bndbox")
-
-        xmin_elem = dom.createElement("xmin")
-        xmin_elem.appendChild(dom.createTextNode(str(x)))
-        bndbox_elem.appendChild(xmin_elem)
-
-        ymin_elem = dom.createElement("ymin")
-        ymin_elem.appendChild(dom.createTextNode(str(y)))
-        bndbox_elem.appendChild(ymin_elem)
-
-        xmax_elem = dom.createElement("xmax")
-        xmax_elem.appendChild(dom.createTextNode(str(x + w)))
-        bndbox_elem.appendChild(xmax_elem)
-
-        ymax_elem = dom.createElement("ymax")
-        ymax_elem.appendChild(dom.createTextNode(str(y + h)))
-        bndbox_elem.appendChild(ymax_elem)
-
-        object_elem.appendChild(bndbox_elem)
-
+        x, y, w, h = bbox[:4]  # Unpack the values correctly
+        object_elem = ET.Element("object")
+        name_elem = ET.SubElement(object_elem, "name")
+        name_elem.text = label  # Use the provided label argument
+        bndbox_elem = ET.SubElement(object_elem, "bndbox")
+        xmin_elem = ET.SubElement(bndbox_elem, "xmin")
+        xmin_elem.text = str(x)
+        ymin_elem = ET.SubElement(bndbox_elem, "ymin")
+        ymin_elem.text = str(y)
+        xmax_elem = ET.SubElement(bndbox_elem, "xmax")
+        xmax_elem.text = str(x + w)
+        ymax_elem = ET.SubElement(bndbox_elem, "ymax")
+        ymax_elem.text = str(y + h)
         return object_elem
    
     def make_hist_im(self, gray):
@@ -108,24 +94,24 @@ class LabelWeeds:
 
     def save_data_voc(self):
         for image_name, image_data in self.data.items():
-            dom = xml.dom.minidom.Document()
-            root_elem = dom.createElement("annotation")
-            dom.appendChild(root_elem)
+            xml_path = os.path.join(self.out_dir, f"{os.path.splitext(os.path.basename(image_name))[0]}.xml")
+            root_elem = ET.Element("annotation")
 
-            filename_elem = dom.createElement("filename")
-            filename_elem.appendChild(dom.createTextNode(os.path.basename(image_name)))
-            root_elem.appendChild(filename_elem)
+            filename_elem = ET.SubElement(root_elem, "filename")
+            filename_elem.text = os.path.basename(image_name)
 
             bbox_list = image_data.get("bbox_list", [])
             for bbox in bbox_list:
                 label = bbox[4]
                 if label:
-                    object_elem = self.make_object_element(bbox[:4], label, dom)
-                    root_elem.appendChild(object_elem)
+                    object_elem = self.make_object_element(bbox[:4], label, root_elem)
+                    root_elem.append(object_elem)
 
-            xml_path = os.path.join(self.out_dir, f"{os.path.splitext(os.path.basename(image_name))[0]}.xml")
-            with open(xml_path, "w", encoding="utf-8") as xml_file:
-                dom.writexml(xml_file, addindent="  ", newl="\n")
+            # Use minidom to prettify the XML
+            xml_str = xml.dom.minidom.parseString(ET.tostring(root_elem)).toprettyxml(indent="  ", newl="\n")
+            with open(xml_path, "wb") as xml_file:
+                xml_file.write(xml_str.encode("utf-8"))
+
 
     def add_images(self):
         assert os.path.isdir(self.path)
@@ -354,4 +340,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     label = LabelWeeds(path=args.path, out=args.out, label_names=args.labels)
     label.run()
-
