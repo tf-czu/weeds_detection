@@ -1,7 +1,12 @@
+"""
+Basic tool for weed labeling, output images in Pascal VOC fomat, compatible with labelImg 1.8.6 (2021-10-10).
+"""
+
 import os
 import cv2
 import numpy as np
 import xml.etree.ElementTree as ET
+import xml.dom.minidom
 
 from image_processing import transform_nir, get_ndvi_im, get_excess_green, get_com_im, noise_reduction, pavel_method
 
@@ -31,7 +36,38 @@ class LabelWeeds:
                             color=color, thickness=1)
             cv2.rectangle(im_to_show, (x, y), (x + w, y + h), color, 1)
         return im_to_show
+    
+    @staticmethod
+    def make_object_element(self, bbox, label, dom):
+        x, y, w, h = bbox
+        object_elem = dom.createElement("object")
 
+        name_elem = dom.createElement("name")
+        name_elem.appendChild(dom.createTextNode(label))
+        object_elem.appendChild(name_elem)
+
+        bndbox_elem = dom.createElement("bndbox")
+
+        xmin_elem = dom.createElement("xmin")
+        xmin_elem.appendChild(dom.createTextNode(str(x)))
+        bndbox_elem.appendChild(xmin_elem)
+
+        ymin_elem = dom.createElement("ymin")
+        ymin_elem.appendChild(dom.createTextNode(str(y)))
+        bndbox_elem.appendChild(ymin_elem)
+
+        xmax_elem = dom.createElement("xmax")
+        xmax_elem.appendChild(dom.createTextNode(str(x + w)))
+        bndbox_elem.appendChild(xmax_elem)
+
+        ymax_elem = dom.createElement("ymax")
+        ymax_elem.appendChild(dom.createTextNode(str(y + h)))
+        bndbox_elem.appendChild(ymax_elem)
+
+        object_elem.appendChild(bndbox_elem)
+
+        return object_elem
+   
     def make_hist_im(self, gray):
         bin_w = 2
         hist_h = 400
@@ -72,38 +108,24 @@ class LabelWeeds:
 
     def save_data_voc(self):
         for image_name, image_data in self.data.items():
-            root_elem = ET.Element("annotation")
+            dom = xml.dom.minidom.Document()
+            root_elem = dom.createElement("annotation")
+            dom.appendChild(root_elem)
 
-            filename_elem = ET.SubElement(root_elem, "filename")
-            filename_elem.text = os.path.basename(image_name)
+            filename_elem = dom.createElement("filename")
+            filename_elem.appendChild(dom.createTextNode(os.path.basename(image_name)))
+            root_elem.appendChild(filename_elem)
 
             bbox_list = image_data.get("bbox_list", [])
             for bbox in bbox_list:
                 label = bbox[4]
                 if label:
-                    object_elem = self.make_object_element(bbox[:4], label)
-                    root_elem.append(object_elem)
+                    object_elem = self.make_object_element(bbox[:4], label, dom)
+                    root_elem.appendChild(object_elem)
 
-            tree = ET.ElementTree(root_elem)
             xml_path = os.path.join(self.out_dir, f"{os.path.splitext(os.path.basename(image_name))[0]}.xml")
-            tree.write(xml_path, encoding="utf-8", xml_declaration=True)
-
-    @staticmethod
-    def make_object_element(bbox, label):
-        x, y, w, h = bbox
-        object_elem = ET.Element("object")
-        name_elem = ET.SubElement(object_elem, "name")
-        name_elem.text = label
-        bndbox_elem = ET.SubElement(object_elem, "bndbox")
-        xmin_elem = ET.SubElement(bndbox_elem, "xmin")
-        xmin_elem.text = str(x)
-        ymin_elem = ET.SubElement(bndbox_elem, "ymin")
-        ymin_elem.text = str(y)
-        xmax_elem = ET.SubElement(bndbox_elem, "xmax")
-        xmax_elem.text = str(x + w)
-        ymax_elem = ET.SubElement(bndbox_elem, "ymax")
-        ymax_elem.text = str(y + h)
-        return object_elem        
+            with open(xml_path, "w", encoding="utf-8") as xml_file:
+                dom.writexml(xml_file, addindent="  ", newl="\n")
 
     def add_images(self):
         assert os.path.isdir(self.path)
@@ -324,11 +346,12 @@ class LabelWeeds:
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='__doc__')
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('path', help='Path to image directory.')
-    parser.add_argument('--out', help='Specify an output directory for annotations.', required=True)
-    parser.add_argument('--labels', nargs='+', help='List of label names.')
+    parser.add_argument('--out', help='Specify an output directory for annotations it is a required parameter.', required=True)
+    parser.add_argument('--labels', nargs='+', help='List of label names it is a required parameter.', required=True)
 
     args = parser.parse_args()
     label = LabelWeeds(path=args.path, out=args.out, label_names=args.labels)
     label.run()
+
