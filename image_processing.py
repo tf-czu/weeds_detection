@@ -43,6 +43,16 @@ def get_ndvi_im(im_color, nir):
     ndvi_im = (ndvi + 1)/2 * 255
     return ndvi_im.astype(np.uint8)
 
+def pavel_method(im_color, nir):
+    b, g, r = cv2.split(im_color)
+    b = b.astype(float)
+    g = g.astype(float)
+    r = r.astype(float)
+    nir = nir.astype(float)
+    processed_im = (((nir + g - r - b) / (nir + g + r + b + 127) * 1.24) + 1) * 127
+    return processed_im.astype(np.uint8)
+
+
 
 def get_com_im(exg, ndvi):
     com_im = exg.astype(np.uint16) * ndvi.astype(np.uint16) / 255
@@ -168,3 +178,5 @@ if __name__ == "__main__":
         test_excess_green(args.path)
     if args.com:
         test_combination(args.path)
+
+        
