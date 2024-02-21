@@ -7,6 +7,8 @@ import cv2
 import numpy as np
 import xml.etree.ElementTree as ET
 import xml.dom.minidom
+from shutil import copyfile
+
 
 from image_processing import transform_nir, get_ndvi_im, get_excess_green, get_com_im, noise_reduction, pavel_method
 
@@ -112,7 +114,6 @@ class LabelWeeds:
             with open(xml_path, "wb") as xml_file:
                 xml_file.write(xml_str.encode("utf-8"))
 
-
     def add_images(self):
         assert os.path.isdir(self.path)
         file_list = os.listdir(self.path)
@@ -123,6 +124,26 @@ class LabelWeeds:
                 if os.path.exists(nir_path):
                     if not color_path in self.data:
                         self.data[color_path] = {"nir": nir_path}
+
+    def update_directory(self):
+        # Iterate through all XML files in the directory
+        for filename in os.listdir(self.path):
+            if filename.endswith(".xml") and "rgb" in filename:
+                xml_path = os.path.join(self.path, filename)
+
+                tree = ET.parse(xml_path)
+                root = tree.getroot()
+
+                # Update filename in the XML
+                filename_element = root.find('filename')
+                filename_element.text = filename.replace("rgb", "nir")
+
+                # Update file extension in the XML
+                filename_element.text = filename_element.text.replace('.xml', '.tiff')
+
+                # Save the modified XML
+                new_xml_path = os.path.join(self.path, filename.replace("rgb", "nir"))
+                tree.write(new_xml_path)
 
     def get_bbox(self, gray):
         assert gray is not None
@@ -313,6 +334,8 @@ class LabelWeeds:
             elif k == ord("u"):  # update bbox_list
                 bbox_list = self.get_bbox(gray)
                 self.data[im_name]["thrvalue"] = self.thrvalue
+            elif k == ord("x"):
+                self.update_directory()     
             elif k == ord("s"):
                 self.save_data_voc()
             elif k == ord("["):  # switch to the previous label
@@ -340,3 +363,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     label = LabelWeeds(path=args.path, out=args.out, label_names=args.labels)
     label.run()
+
