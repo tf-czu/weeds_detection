@@ -5,8 +5,9 @@
 import time
 import zmq
 import cv2
+import msgpack
 
-import osgar.lib.serialize
+# import osgar.lib.serialize
 
 
 class ZmqPush:
@@ -17,7 +18,9 @@ class ZmqPush:
         self.socket.bind(endpoint)
 
     def push_msg(self, data):
-        raw = osgar.lib.serialize.serialize(data)
+        # This part is necessary for compatibility with OSCAR
+        # raw = osgar.lib.serialize.serialize(data)  # more universal
+        raw = msgpack.packb(data, use_bin_type=True)
         self.socket.send_multipart([bytes("images", 'ascii'), raw])
 
     def close(self):
@@ -34,7 +37,7 @@ def camera(port = 0):
             if ret:
                 retval, data = cv2.imencode('*.jpeg', frame)
                 if len(data) > 0:
-                    push.push_msg(data)
+                    push.push_msg(data.tobytes())
                     time.sleep(1)
     except KeyboardInterrupt:
         pass
@@ -42,3 +45,5 @@ def camera(port = 0):
     finally:
         cap.release()
         push.close()
+
+camera()
