@@ -19,9 +19,25 @@
           "directory": "cabbage_tracker/images",
           "frequency_hz": 5
         }
+      },
+
+      "gps": {
+        "driver": "gps",
+        "init": {}
+      },
+
+      "cabbage": {
+        "driver": "cabbage_tracker.cabbage_tracker:Cabbage",
+        "in": ["image", "nmea_data"],
+        "out": ["detection"],
+        "init": {}
       }
 
     },
-    "links": []
+    "links": [
+      [ "generator.raw", "gps.raw"],
+      ["gps.nmea_data", "cabbage.nmea_data"],
+      ["camera.image", "cabbage.image"]
+    ]
   }
 }
