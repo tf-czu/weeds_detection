@@ -3,13 +3,24 @@
   "robot": {
     "modules": {
       "generator": {
-          "driver": "nmea_generator:NMEAGenerator",
+          "driver": "cabbage_tracker.nmea_generator:NMEAGenerator",
           "in": [],
           "out": ["raw"],
           "init": {
             "heading_deg": 45
           }
+      },
+
+      "camera": {
+        "driver": "cabbage_tracker.dummy_camera:DummyCamera",
+        "in": [],
+        "out": [],
+        "init": {
+          "directory": "cabbage_tracker/images",
+          "frequency_hz": 5
+        }
       }
+
     },
     "links": []
   }
