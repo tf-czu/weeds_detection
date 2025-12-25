@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "robot": {
+    "modules": {
+      "generator": {
+          "driver": "nmea_generator:NMEAGenerator",
+          "in": [],
+          "out": ["raw"],
+          "init": {
+            "heading_deg": 45
+          }
+      }
+    },
+    "links": []
+  }
+}
