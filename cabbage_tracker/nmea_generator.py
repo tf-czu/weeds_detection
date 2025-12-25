@@ -1,4 +1,7 @@
-import time
+"""
+    Generator of coordinates in NMEA format.
+"""
+
 import math
 import datetime
 from threading import Thread
@@ -18,7 +21,6 @@ class NMEAGenerator:
 
         # Simulation starts now
         self.current_time = datetime.datetime.utcnow()
-
         self.R_EARTH = 6378137.0  # Earth radius (m)
 
     def start(self):
@@ -26,7 +28,6 @@ class NMEAGenerator:
 
     def join(self, timeout=None):
         self.input_thread.join(timeout=timeout)
-
 
 
     def _decimal_to_nmea_coord(self, decimal_degrees, is_latitude):
@@ -78,7 +79,6 @@ class NMEAGenerator:
         """
         Generate one GNGGA message
         """
-
         self._move_position()
         time_str = self.current_time.strftime("%H%M%S.%f")[:9]
         lat_str, lat_dir = self._decimal_to_nmea_coord(self.lat, is_latitude=True)
@@ -113,20 +113,3 @@ class NMEAGenerator:
 
     def request_stop(self):
         self.bus.shutdown()
-
-
-if __name__ == "__main__":
-    # Setting: speed 100 km/h (27.7 m/s), direction East (90°), 5 Hz
-    sim = NMEAGenerator(
-        start_lat=50.0755,
-        start_lon=14.4378,
-        speed_mps=27.7,
-        heading_deg=90,
-        frequency_hz=5.0
-    )
-
-    print("Generuji prvních 10 zpráv:")
-    for _ in range(10):
-        msg = sim.generate_gngga()
-        print(msg)
-        time.sleep(sim.interval)
