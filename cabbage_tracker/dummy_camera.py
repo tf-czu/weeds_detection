@@ -50,7 +50,10 @@ class DummyCamera:
                     dt = time.time() - self.last_im_time
                     self.bus.sleep(self.interval - dt)
                 self.last_im_time = time.time()
-                self.bus.publish("image", img)
+
+                success, encoded_image = cv2.imencode('*.jpeg', img)
+                if success:
+                    self.bus.publish("image", encoded_image.tobytes())
                 ii += 1
                 if ii == n:
                     ii = 0

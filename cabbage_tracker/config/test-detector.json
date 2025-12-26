@@ -17,7 +17,7 @@
         "out": [],
         "init": {
           "directory": "cabbage_tracker/images",
-          "frequency_hz": 5
+          "frequency_hz": 0.5
         }
       },
 
@@ -30,7 +30,9 @@
         "driver": "cabbage_tracker.cabbage_tracker:Cabbage",
         "in": ["image", "nmea_data"],
         "out": ["detection"],
-        "init": {}
+        "init": {
+          "model": "cabbage_tracker/images/best2.pt"
+        }
       }
 
     },
