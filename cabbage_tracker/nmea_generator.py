@@ -15,9 +15,9 @@ class NMEAGenerator:
 
         self.lat = config.get("start_lat", 50.0755)
         self.lon = config.get("start_lon", 14.4378)
-        self.speed = config.get("speed_mps", 1)
+        self.speed = config.get("speed_mps", 0.3)
         self.heading = math.radians(config.get("heading_deg", 90))
-        self.interval = 1.0 / config.get("frequency_hz", 10)
+        self.interval = 1.0 / config.get("frequency_hz", 5)
 
         # Simulation starts now
         self.current_time = datetime.datetime.utcnow()
