@@ -5,10 +5,15 @@ import math
 import cv2
 import numpy as np
 from collections import deque
+import csv
+from datetime import datetime
+import logging
 
 from osgar.node import Node
 from osgar.lib.route import Convertor as GPSConvertor
 from cabbage_tracker.detector import Detector
+
+g_logger = logging.getLogger(__name__)
 
 
 def is_point_in_history(history, x, y, max_dist = 0.05):
@@ -107,6 +112,11 @@ class Cabbage(Node):
         self.f = 2048/( 2 * math.tan(math.radians( 47.98/2 )) )  # pixel focus length from camera FOV
         self.cabbage_history = []
 
+        self.csv_file = open(datetime.now().strftime("cab_coordinates_%Y%m%d_%H%M%S.csv"),
+                             mode='w', newline='', encoding='utf-8')
+        self.csv_writer = csv.writer(self.csv_file)
+
+
     def get_rel_pose(self, cx, cy):
         """
         Keep x on right and y forward
@@ -121,7 +131,6 @@ class Cabbage(Node):
     def on_image(self, data):
         image = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), 1)
         im_h, im_w, __ = image.shape
-        print(image.shape)
         assert (im_h == 1536) and (im_w == 2048), image.shape
 
         detections = self.detector.detect(image)
@@ -151,7 +160,12 @@ class Cabbage(Node):
                     self.publish('cab_pose', [cab_x, cab_y])
                     cab_lon, cab_lat = self.gps_converter.planar2geo([cab_x, cab_y])
                     self.publish('cab_coordinates', [cab_lon, cab_lat])
-                    if self.verbose or True:
+                    try:
+                        self.csv_writer.writerow([cab_lon, cab_lat])
+                        self.csv_file.flush()
+                    except ValueError:
+                        g_logger.warning ('CSV log file is already closed!')
+                    if self.verbose:
                         print(cab_x, cab_y)
                         print(cab_lon, cab_lat)
 
@@ -169,4 +183,9 @@ class Cabbage(Node):
                 x = 0
                 y = 0
             self.xy_history.append([self.time, [x, y]])
+
+    def request_stop(self):
+        self.csv_file.close()
+        super().request_stop()
+
 

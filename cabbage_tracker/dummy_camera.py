@@ -43,6 +43,7 @@ class DummyCamera:
             images_paths = self.load_images()
             n = len(images_paths)
             assert n != 0, images_paths
+            self.bus.sleep(1)  # start a little later
             ii = 0
             while self.bus.is_alive():
                 img = cv2.imread(images_paths[ii])
