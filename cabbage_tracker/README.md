@@ -28,3 +28,13 @@ Below is a sample animation of the detection:
    # Quick analysis of results:
    python -m osgar.logger <log name>
     ```
+## License
+
+### Code
+The source code of this project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+### Model and Weights
+The trained model [weights](images/best2.pt) included in this repository were trained using the **Ultralytics YOLO** framework. 
+- The weights are provided for research and demonstration purposes.
+- Please note that the use of Ultralytics software and the resulting models is governed by the **AGPL-3.0 License**. For commercial use, a separate commercial license from Ultralytics may be required.
+- The training dataset consists of custom data proprietary to the authors.
