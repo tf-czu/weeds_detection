@@ -1,0 +1,45 @@
+{
+  "version": 2,
+  "robot": {
+    "modules": {
+      "generator": {
+          "driver": "cabbage_tracker.nmea_generator:NMEAGenerator",
+          "in": [],
+          "out": ["raw"],
+          "init": {
+            "heading_deg": 45
+          }
+      },
+
+      "camera": {
+        "driver": "cabbage_tracker.dummy_camera:DummyCamera",
+        "in": [],
+        "out": [],
+        "init": {
+          "directory": "cabbage_tracker/images",
+          "frequency_hz": 0.5
+        }
+      },
+
+      "gps": {
+        "driver": "gps",
+        "init": {}
+      },
+
+      "cabbage": {
+        "driver": "cabbage_tracker.cabbage_tracker:Cabbage",
+        "in": ["image", "nmea_data"],
+        "out": ["detection"],
+        "init": {
+          "model": "cabbage_tracker/images/best2.pt"
+        }
+      }
+
+    },
+    "links": [
+      [ "generator.raw", "gps.raw"],
+      ["gps.nmea_data", "cabbage.nmea_data"],
+      ["camera.color", "cabbage.image"]
+    ]
+  }
+}
