@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "robot": {
+    "modules": {
+      "gps_serial": {
+          "driver": "serial",
+          "in": [],
+          "out": ["raw"],
+          "init": {"port": "/dev/ttyUSB0", "speed": 4800}
+      },
+
+      "camera": {
+          "driver": "osgar.drivers.oak_camera:OakCamera",
+          "init": {
+            "fps": 1,
+            "is_color": true,
+            "cam_id": "192.168.1.61",
+            "color_resolution": "THE_1080_P"
+          }
+      },
+
+      "gps": {
+        "driver": "gps",
+        "in": ["raw"],
+        "out": ["nmea_data"],
+        "init": {}
+      },
+
+      "cabbage": {
+        "driver": "cabbage_tracker.cabbage_tracker:Cabbage",
+        "in": ["image", "nmea_data"],
+        "out": ["detection"],
+        "init": {
+          "model": "cabbage_tracker/images/best2.pt",
+          "frame_size": [1920, 1080],
+          "fov": 69
+        }
+      }
+
+    },
+    "links": [
+      [ "gps_serial.raw", "gps.raw"],
+      ["gps.nmea_data", "cabbage.nmea_data"],
+      ["camera.color", "cabbage.image"]
+    ]
+  }
+}

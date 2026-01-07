@@ -14,7 +14,7 @@ g_logger = logging.getLogger(__name__)
 class DummyCamera:
     def __init__(self, config, bus):
         self.bus = bus
-        self.bus.register("image")
+        self.bus.register("color")
         self.interval = 1.0 / config.get("frequency_hz", 5)
         self.im_dir = config.get("directory")
         if self.im_dir is None:
@@ -54,7 +54,7 @@ class DummyCamera:
 
                 success, encoded_image = cv2.imencode('*.jpeg', img)
                 if success:
-                    self.bus.publish("image", encoded_image.tobytes())
+                    self.bus.publish("color", encoded_image.tobytes())
                 ii += 1
                 if ii == n:
                     ii = 0

@@ -108,8 +108,10 @@ class Cabbage(Node):
         self.gps_converter = None
         self.xy_history = deque(maxlen=5)  # keep buffer with desired length.
         self.lonlat_0 = None
+        self.frame_size = config.get("frame_size", [2048, 1536])
+        fov = config.get("fov", 47.98)
         self.h = 0.45  # Estimated camera distance to surface reduced by plant height
-        self.f = 2048/( 2 * math.tan(math.radians( 47.98/2 )) )  # pixel focus length from camera FOV
+        self.f = self.frame_size[0]/( 2 * math.tan(math.radians( fov/2 )) )  # pixel focus length from camera FOV
         self.cabbage_history = []
 
         self.csv_file = open(datetime.now().strftime("cab_coordinates_%Y%m%d_%H%M%S.csv"),
@@ -121,8 +123,8 @@ class Cabbage(Node):
         """
         Keep x on right and y forward
         """
-        rel_cx = cx - 2048/2
-        rel_cy = 1536/2 - cy
+        rel_cx = cx - self.frame_size[0]/2
+        rel_cy = self.frame_size[1]/2 - cy
         x = (rel_cx * self.h) / self.f
         y = (rel_cy * self.h) / self.f
 
@@ -131,7 +133,7 @@ class Cabbage(Node):
     def on_image(self, data):
         image = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), 1)
         im_h, im_w, __ = image.shape
-        assert (im_h == 1536) and (im_w == 2048), image.shape
+        assert (im_h == self.frame_size[1]) and (im_w == self.frame_size[0]), image.shape
 
         detections = self.detector.detect(image)
         self.publish('detection', detections)

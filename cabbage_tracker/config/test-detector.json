@@ -39,7 +39,7 @@
     "links": [
       [ "generator.raw", "gps.raw"],
       ["gps.nmea_data", "cabbage.nmea_data"],
-      ["camera.image", "cabbage.image"]
+      ["camera.color", "cabbage.image"]
     ]
   }
 }
