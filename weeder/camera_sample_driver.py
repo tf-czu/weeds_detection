@@ -13,7 +13,8 @@ import msgpack
 class ZmqPush:
     def __init__(self, endpoint = "tcp://*:5559"):
         context = zmq.Context.instance()
-        self.socket = context.socket(zmq.PUSH)
+        # self.socket = context.socket(zmq.PUSH)
+        self.socket = context.socket(zmq.PUB)
         self.socket.setsockopt(zmq.LINGER, 100)  # milliseconds
         self.socket.bind(endpoint)
 
