@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "robot": {
+    "modules": {
+      "from_camera": {
+        "driver": "osgar.drivers.pull:Pull",
+        "init": {
+          "endpoint": "tcp://127.0.0.1:5559",
+          "pubsub": true,
+          "outputs": ["images"]
+        }
+      }
+    },
+
+    "links": []
+  }
+}
